@@ -80,12 +80,12 @@ void serial_puts(const char* str);
 
 void enable_irq_57(void)
 {
-	mmio_write(0x2000B214, 0x02000000);
+	mmio_write(0x2000B214, 0x02000000); //Enables UART interrupts
 }
 
 void disable_irq_57(void)
 {
-	mmio_write(0x2000B220, 0x02000000);
+	mmio_write(0x2000B220, 0x02000000); //Disables UART interrupts
 }
 
 void banner(void)
@@ -94,33 +94,33 @@ void banner(void)
 	serial_puts(MS2);
 }
 
-int calc_add(int l, int r);
-int calc_sub(int l, int r);
-long long calc_mul(int l, int r);
-int calc_div(int* rem, int l, int r);
+int calc_add(int l, int r); //Declares the assembly addition function
+int calc_sub(int l, int r); //Declares the assembly subtraction function
+long long calc_mul(int l, int r); //Declares the assembly multiplication function
+int calc_div(int* rem, int l, int r); //Declares the assembly division function
 
-int atoi__(const char* v)
+int atoi__(const char* v) //Used to convert a string to an integer type
 {
-	int acc = 0;
-	int s = 1;
+	int acc = 0; //Initializes accumulated value
+	int s = 1; //Initializes the sign variable.
 	if(*v == '-')
 	{
-		s = -1;
-		++v;
+		s = -1; //If the string number is negative, the resulting value below will be multiplied by -1
+		++v; //Progress string by one element
 	}
-	while(*v != '\0')
-		acc = acc * 10 + *(v++) - '0';
-	return acc*s;
+	while(*v != '\0') //While string character does not equal the end...
+		acc = acc * 10 + *(v++) - '0'; //Acc is calculated as the integer value pulled from the string input
+	return acc*s; //Resulting integer is multipled by the sign variable (see line 108)
 }
 
-const char* reverseStr(char* str, uint32_t len)
+const char* reverseStr(char* str, uint32_t len) //Returns a reverse string version of the string input
 {
-	uint32_t l = 0;
-	uint32_t r = len-1;
-	while(l < r)
+	uint32_t l = 0; //Initializes first variable which will be the first element of the input string
+	uint32_t r = len-1; //Initializes the second variable which will be the last element in the input string.
+	while(l < r) //While string character variables are not in the middle of the string...
 	{
-		char tmp = str[l];
-		str[l] = str[r];
+		char tmp = str[l]; //Use SWAP format (temp variable)
+		str[l] = str[r]; //to swap first and last elements until middle of string is reached.
 		str[r] = tmp;
 		++l;
 		--r;
@@ -129,7 +129,36 @@ const char* reverseStr(char* str, uint32_t len)
 	return str;
 }
 
-const char* itoa__(int val, char* buf, int base)
+const char* itoa__(int val, char* buf, int base) //Returns a string version of an integer value input.
+{
+	if(val == 0) //If the input integer is 0, return a string value of "0"
+		return "0";
+	
+	uint32_t i = 0; //Used to iterate through the output string variable
+	uint8_t n = 0; //Used to flag if a String variable as a negative.
+	if(val < 0)
+	{
+		n = 1; //If input value is negative, the negative flag is set high.
+		val = -val; //The input value is then negated
+	}
+	
+	
+	int rem = 0; //Used in implementation of calc div
+	while(val != 0)
+	{
+		val = calc_div(&rem,val,base); //Find the modulus (remainder of div) to convert each digit in the integer into a string character
+ 		buf[i] = ((uint8_t) rem) + '0';
+		i++;
+	}
+	if(n)
+		buf[i++] = '-'; //If negative flag was set high, add negative sign to string
+	buf[i] = '\0'; //Add NULL ending character when process is completed.
+	
+	
+	return reverseStr(buf,i); //Return reversed string verison of created output, as its current state is a flipped version of the desired outcome.
+}
+
+const char* lltoa__(long long val, char* buf, int base) //Identical in function to itoa but converts long long types into strings.
 {
 	if(val == 0)
 		return "0";
@@ -153,66 +182,37 @@ const char* itoa__(int val, char* buf, int base)
 	if(n)
 		buf[i++] = '-';
 	buf[i] = '\0';
-	
-	
 	return reverseStr(buf,i);
 }
 
-const char* lltoa__(long long val, char* buf, int base)
+int serial_read_num(int* succeed) //Used to take user input from terminal and validates that it's a number
 {
-	if(val == 0)
-		return "0";
-	
-	uint32_t i = 0;
-	uint8_t n = 0;
-	if(val < 0)
-	{
-		n = 1;
-		val = -val;
-	}
-	
-	
-	int rem = 0;
-	while(val != 0)
-	{
-		val = calc_div(&rem,val,base);
-		buf[i] = ((uint8_t) rem) + '0';
-		i++;
-	}
-	if(n)
-		buf[i++] = '-';
-	buf[i] = '\0';
-	return reverseStr(buf,i);
-}
-
-int serial_read_num(int* succeed)
-{
-	char buf[12];
+	char buf[12]; //Creates buffer to store input
 	uint8_t n = 0;
 	while(1)
 	{
-		do buf[n] = serial_getc(); while(buf[n] == '\0');
-		if(buf[n] == '\r')
+		do buf[n] = serial_getc(); while(buf[n] == '\0'); //Uses getc to accept input character-by-character via interrupts.
+		if(buf[n] == '\r') //If no user input is provided...
 		{
-			buf[n] = '\0';
-			serial_puts("\n");
+			buf[n] = '\0'; //Buffer is declared empty.
+			serial_puts("\n"); //Creates a new line
 			
 			break;
 		}
-		n++;
+		n++; //Increments buffer element when character is accepted.
 		
-		if(n == 12)
+		if(n == 12) //If buffer is exceeded...
 		{
 			serial_puts("\r\nNumber too large!");
 			*succeed = 0;
-			return 0;
+			return 0; //Resets buffer and returns 0 as an integer.
 		}
 	}
 	n = 0;
-	if(buf[n] == '-')
+	if(buf[n] == '-') //Ignore negative signs when validating if input is a number
 		++n;
 	
-	for(; buf[n] != '\0'; ++n)
+	for(; buf[n] != '\0'; ++n) //Process used to validate if input consists only of digits.
 		if('0' > buf[n] || buf[n] > '9' )
 		{
 			serial_puts("\r\nNot a number.");
@@ -221,62 +221,62 @@ int serial_read_num(int* succeed)
 		}
 	
 	*succeed = 1;
-	return atoi__(buf);
+	return atoi__(buf); //Sends successful inptu to atoi to convert to integer type
 }
 
-void calc(void)
+void calc(void) //Handles calculator functions. Functionally identical to the first demo code.
 {
 	for(;;)
 	{
 		serial_puts("\r\nCalculator\r\n==========\r\n\t(1) Add\r\n\t(2) Subtract\r\n\t(3) Multiply\r\n\t(4) Divide\r\n\t(0) Exit\r\nEnter #: ");
 		
-		char buf[20];
+		char buf[20]; //Used to store calculator inputs.
 		int succeed = 0;
 
-		int val = serial_read_num(&succeed);
-		if(!succeed)
+		int val = serial_read_num(&succeed); //Used to accept user input (the function choice)
+		if(!succeed) //If value is not an acceptable input...
 		{
-			continue;
+			continue; //Reset calc function.
 		}
-		if(val == 0)
+		if(val == 0) //If input is '0', exit.
 			return;
-		int l;
+		int l; //Used to store the first operand input
 		do
 		{
 			if(!succeed)
 				serial_puts("\r\nPlease enter a number.");
 			serial_puts("\r\nFirst Number: ");
-			l = serial_read_num(&succeed);
+			l = serial_read_num(&succeed); //Used to store user input into l
 		} while(!succeed);
 		serial_puts(itoa__(l,buf,10));
-		int r;
+		int r; //Used to store the second operand input
 		do
 		{
 			if(!succeed)
 				serial_puts("\r\nPlease enter a number.");
 			serial_puts("\r\nSecond Number: ");
-			r = serial_read_num(&succeed);
+			r = serial_read_num(&succeed); //Used to store user input into r
 		} while(!succeed);
 		serial_puts(itoa__(r,buf,10));
 		
 
 		int rem;
-		int res;
+		int res; //Declares division variables to use in the calc_div function.
 		
 		serial_puts("\r\nAnswer:");
 		
 		switch(val)
 		{
 			case 1:
-			serial_puts(itoa__(calc_add(l,r),buf,10));
+			serial_puts(itoa__(calc_add(l,r),buf,10)); //Returns calc_add operation with two specified inputs. Stored into buf.
 			break;
 			case 2:
-			serial_puts(itoa__(calc_sub(l,r),buf,10));
+			serial_puts(itoa__(calc_sub(l,r),buf,10)); //Returns calc_sub operation with two specified inputs. Stored into buf.
 			break;
 			case 3:
-			serial_puts(lltoa__(calc_mul(l,r),buf,10));
+			serial_puts(lltoa__(calc_mul(l,r),buf,10)); //Returns calc_mul operation with two specified inputs. Stored into buf.
 			break;
-			case 4:
+			case 4: //Returns calc_div operation with two specified inputs. Stored into buf.
 			if(!r)
 			{
 				serial_puts("\r\nCan't have a 0 as a divisor.");
@@ -305,7 +305,7 @@ void HELP(void) //Command List
 }
 
 void serial_puts(const char *str);
-void String()
+void String() //Prints a string using interrupts when called.
 {
 	serial_puts("\r\nHello, God. Please make this work.");
 }
@@ -344,7 +344,7 @@ void testdelay(void)
 }
 
 const char* iwptr = 0;
-void kernel_main() 
+void kernel_main() //Used to initialize the TinyOS kernel
 {
 	iwptr = 0;
 	uart_init();
@@ -368,57 +368,57 @@ char irbuff[BUFF_SIZE];
 uint32_t r_r = 0;
 uint32_t r_w = 0;
 
-int serial_getc()
+int serial_getc() //Used to accept user input character by character
 {
 	if(r_r == r_w)
-		return '\0';
-	 char tmp = irbuff[r_r++];
+		return '\0'; //If input was empty
+	 char tmp = irbuff[r_r++]; //Tmp is character accepted from the buffer, which olds interrupt inputs
 	 if(r_r >= BUFF_SIZE)
 		r_r = 0;
-	return tmp;
+	return tmp; //Return the accepted input character
 }
 
-void uart_set_transmit_interrupt(int b);
-int uart_is_transmit_interrupt_enabled();
+void uart_set_transmit_interrupt(int b); //Flag transmit interrupt as high.
+int uart_is_transmit_interrupt_enabled(); //Boolean to determine if transmit interrupt is enabled.
 
-void serial_puts(const char *str)
+void serial_puts(const char *str) //Used to print a string out to the terminal using interrupts.
 {
 	while(iwptr){}
 	//while(uart_is_transmit_interrupt_enabled()){}
-	iwptr = str;
-	uart_set_transmit_interrupt(1);
+	iwptr = str; //Prints the contents of input string by inserting string into the iwptr buffer, which uses interrupts to print items.
+	uart_set_transmit_interrupt(1); //Enable transmit interrupt to print string.
 }
 
-void serial_putc(char c)
+void serial_putc(char c) //Used to print a character out to the terminal
 {
-	char buf[2];
+	char buf[2]; //Buffer used to store character to print
 	buf[0] = c;
 	buf[1] = '\0';
-	serial_puts(buf);
-	while(uart_is_transmit_interrupt_enabled()){}
+	serial_puts(buf); //Used serial_puts to print the character and null character
+	while(uart_is_transmit_interrupt_enabled()){} //Waiting hold while transmit interrupt is enabled.
 }
 
-int uart_is_transmittable();
+int uart_is_transmittable(); 
 int uart_is_receivable();
 
 void irq_handler(void)
 {
-	if (uart_is_receivable()) //Receive
+	if (uart_is_receivable()) //IRQ branches here if intent is to recieve data.
 	{
-		uint8_t c  = uart_readc();
-		uart_putc(c);
+		uint8_t c  = uart_readc(); //Reads character from UART
+		uart_putc(c); //Prints character
 		
-		irbuff[r_w++] = c;
-		if(r_w >= BUFF_SIZE)
+		irbuff[r_w++] = c; //Adds character to buffer
+		if(r_w >= BUFF_SIZE) //If input length is larger than buffer, reset buffer.
 			r_w = 0;
 	}
-	if (uart_is_transmittable()) //Transmit
+	if (uart_is_transmittable()) //IRQ branches here if intent is to transmit data.
 	{
-		uart_putc(*iwptr++);
-		if(*iwptr == '\0')
+		uart_putc(*iwptr++); //Print character by character contents of iwptr buffer
+		if(*iwptr == '\0') //When end of buffer is reached
 		{
-			iwptr = 0;
-			uart_set_transmit_interrupt(0);
+			iwptr = 0; //Reset iwptr buffer
+			uart_set_transmit_interrupt(0); //Disable UART transmitter interrupt.
 		}
 	}
 }
